@@ -17,10 +17,13 @@ const SignupPage = () => {
     e.preventDefault();
     if (password.length < 6) { toast.error("Password must be at least 6 characters"); return; }
     setLoading(true);
-    const { error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } });
+    const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } });
     setLoading(false);
     if (error) {
       toast.error(error.message);
+    } else if (data.session) {
+      toast.success("Account created successfully!");
+      navigate("/app");
     } else {
       toast.success("Check your email to confirm your account");
       navigate("/login");
