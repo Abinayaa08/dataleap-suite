@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react";
-import { X, Send, Mic } from "lucide-react";
+import { X, Send, Mic, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { supabase } from "@/integrations/supabase/client";
 import type { UploadedFile } from "@/pages/AppPage";
 
 interface Message {
@@ -16,10 +17,11 @@ interface AssistantPanelProps {
 
 export const AssistantPanel = ({ files, onClose }: AssistantPanelProps) => {
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: "Hello! I can help you understand your data, explain patterns, and modify your dashboard. Try asking me something like \"Why is January revenue high?\" or type @ to reference specific files." },
+    { role: "assistant", content: "Hello! I can help you understand your data, explain patterns, and provide insights. Try asking me something like \"Why is January revenue high?\" or type @ to reference specific files." },
   ]);
   const [input, setInput] = useState("");
   const [showFiles, setShowFiles] = useState(false);
+  const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -36,18 +38,58 @@ export const AssistantPanel = ({ files, onClose }: AssistantPanelProps) => {
     setShowFiles(false);
   };
 
-  const handleSend = () => {
-    if (!input.trim()) return;
+  const buildDataContext = (): string => {
+    if (files.length === 0) return "No data uploaded yet.";
+    
+    const parts: string[] = [];
+    files.forEach((f) => {
+      parts.push(`File: ${f.name}`);
+      parts.push(`Columns: ${f.columns.join(", ")}`);
+      if (f.data && f.data.length > 0) {
+        const header = f.columns.join(" | ");
+        parts.push(header);
+        // Include all data rows (or limit for very large datasets)
+        const rows = f.data.slice(0, 50).map((r) => r.join(" | "));
+        parts.push(rows.join("\n"));
+        
+        // Add basic stats for numeric columns
+        f.columns.forEach((col, idx) => {
+          const values = f.data!.map((r) => Number(r[idx])).filter((n) => !isNaN(n));
+          if (values.length > 0) {
+            const sum = values.reduce((a, b) => a + b, 0);
+            const avg = sum / values.length;
+            const max = Math.max(...values);
+            const min = Math.min(...values);
+            parts.push(`${col} stats: min=${min}, max=${max}, avg=${avg.toFixed(2)}, total=${sum.toFixed(2)}`);
+          }
+        });
+      }
+    });
+    return parts.join("\n");
+  };
+
+  const handleSend = async () => {
+    if (!input.trim() || loading) return;
     const userMsg: Message = { role: "user", content: input };
     setMessages((prev) => [...prev, userMsg]);
+    const question = input;
     setInput("");
     setShowFiles(false);
+    setLoading(true);
 
-    // Generate a contextual response based on data
-    setTimeout(() => {
-      const response = generateResponse(input, files);
-      setMessages((prev) => [...prev, { role: "assistant", content: response }]);
-    }, 800);
+    try {
+      const dataContext = buildDataContext();
+      const { data, error } = await supabase.functions.invoke("ai-assistant", {
+        body: { question, dataContext },
+      });
+
+      if (error) throw error;
+      setMessages((prev) => [...prev, { role: "assistant", content: data.answer }]);
+    } catch (err: any) {
+      setMessages((prev) => [...prev, { role: "assistant", content: `Sorry, I couldn't process that request. ${err.message || "Please try again."}` }]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -63,7 +105,7 @@ export const AssistantPanel = ({ files, onClose }: AssistantPanelProps) => {
         {messages.map((msg, i) => (
           <div key={i} className={`text-sm ${msg.role === "user" ? "text-right" : ""}`}>
             <div
-              className={`inline-block px-3 py-2 rounded-lg max-w-[90%] ${
+              className={`inline-block px-3 py-2 rounded-lg max-w-[90%] whitespace-pre-wrap ${
                 msg.role === "user"
                   ? "bg-foreground text-background"
                   : "bg-secondary text-foreground"
@@ -73,10 +115,16 @@ export const AssistantPanel = ({ files, onClose }: AssistantPanelProps) => {
             </div>
           </div>
         ))}
+        {loading && (
+          <div className="text-sm">
+            <div className="inline-block px-3 py-2 rounded-lg bg-secondary text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+            </div>
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* File selector */}
       {showFiles && files.length > 0 && (
         <div className="border-t p-2 space-y-1">
           {files.map((f) => (
@@ -98,41 +146,15 @@ export const AssistantPanel = ({ files, onClose }: AssistantPanelProps) => {
           onKeyDown={(e) => e.key === "Enter" && handleSend()}
           placeholder="Ask about your data..."
           className="text-sm h-9"
+          disabled={loading}
         />
         <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0">
           <Mic className="h-4 w-4" />
         </Button>
-        <Button size="icon" onClick={handleSend} className="h-9 w-9 shrink-0">
+        <Button size="icon" onClick={handleSend} className="h-9 w-9 shrink-0" disabled={loading}>
           <Send className="h-3.5 w-3.5" />
         </Button>
       </div>
     </div>
   );
 };
-
-function generateResponse(question: string, files: UploadedFile[]): string {
-  const q = question.toLowerCase();
-  const allData = files.flatMap((f) => f.data || []);
-
-  if (allData.length === 0) return "No data loaded. Please upload files first.";
-
-  const revenues = allData.map((r) => ({ month: r[0], value: Number(r[1]) }));
-  const maxMonth = revenues.reduce((a, b) => (b.value > a.value ? b : a));
-  const minMonth = revenues.reduce((a, b) => (b.value < a.value ? b : a));
-  const totalRevenue = revenues.reduce((s, r) => s + r.value, 0);
-  const avgRevenue = totalRevenue / revenues.length;
-
-  if (q.includes("high") || q.includes("best") || q.includes("top")) {
-    return `${maxMonth.month} had the highest revenue at $${maxMonth.value.toLocaleString()}.\n\nThis is ${((maxMonth.value / avgRevenue - 1) * 100).toFixed(0)}% above the average of $${avgRevenue.toFixed(0)}.\n\nPossible factors: seasonal demand peaks, marketing campaigns, or promotional periods.\n\nRecommendation: Analyze what activities drove this peak and replicate them in lower-performing months.`;
-  }
-
-  if (q.includes("low") || q.includes("worst") || q.includes("drop")) {
-    return `${minMonth.month} had the lowest revenue at $${minMonth.value.toLocaleString()}.\n\nThis is ${((1 - minMonth.value / avgRevenue) * 100).toFixed(0)}% below the average.\n\nPossible factors: seasonal slowdown, reduced marketing spend, or market saturation.\n\nSuggestion: Consider targeted campaigns or promotions during this period.`;
-  }
-
-  if (q.includes("trend") || q.includes("pattern") || q.includes("overview")) {
-    return `Data overview:\n\n• Total revenue: $${totalRevenue.toLocaleString()}\n• Average monthly: $${avgRevenue.toFixed(0)}\n• Peak: ${maxMonth.month} ($${maxMonth.value.toLocaleString()})\n• Low: ${minMonth.month} ($${minMonth.value.toLocaleString()})\n• Range: $${(maxMonth.value - minMonth.value).toLocaleString()}\n\nThe data shows variability across months suggesting seasonal patterns.`;
-  }
-
-  return `Based on your ${allData.length} data points across ${files.length} file(s):\n\n• Revenue ranges from $${minMonth.value.toLocaleString()} to $${maxMonth.value.toLocaleString()}\n• Average: $${avgRevenue.toFixed(0)}\n\nAsk me about specific trends, comparisons, or insights you'd like to explore.`;
-}

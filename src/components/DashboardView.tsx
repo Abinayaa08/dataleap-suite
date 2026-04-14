@@ -1,10 +1,13 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import type { UploadedFile } from "@/pages/AppPage";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { BarChartWidget } from "@/components/dashboard/BarChartWidget";
 import { LineChartWidget } from "@/components/dashboard/LineChartWidget";
 import { PieChartWidget } from "@/components/dashboard/PieChartWidget";
 import { DataTableWidget } from "@/components/dashboard/DataTableWidget";
+import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
+import { toast } from "sonner";
 
 const quarters: Record<string, string[]> = {
   Q1: ["Jan", "Feb", "Mar"],
@@ -19,6 +22,7 @@ interface DashboardViewProps {
 
 export const DashboardView = ({ files }: DashboardViewProps) => {
   const [filter, setFilter] = useState<string>("all");
+  const dashboardRef = useRef<HTMLDivElement>(null);
 
   const allData = useMemo(() => {
     const combined: any[][] = [];
@@ -45,21 +49,41 @@ export const DashboardView = ({ files }: DashboardViewProps) => {
 
   const filterOptions = ["all", "Q1", "Q2", "Q3", "Q4", ...["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]];
 
+  const handleExportCSV = () => {
+    if (filteredData.length === 0) return;
+    const header = columns.join(",");
+    const rows = filteredData.map((r) => r.join(","));
+    const csv = [header, ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `dashboard-export-${filter}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Dashboard exported as CSV");
+  };
+
   return (
-    <div className="h-full flex flex-col p-4 gap-4">
-      {/* Filters */}
-      <div className="flex items-center gap-1 overflow-x-auto shrink-0">
-        {filterOptions.map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-3 py-1 text-xs rounded-md transition-colors whitespace-nowrap ${
-              filter === f ? "bg-foreground text-background" : "bg-secondary text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {f === "all" ? "All" : f}
-          </button>
-        ))}
+    <div ref={dashboardRef} className="h-full flex flex-col p-4 gap-4">
+      {/* Filters + Export */}
+      <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1 overflow-x-auto flex-1">
+          {filterOptions.map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-3 py-1 text-xs rounded-md transition-colors whitespace-nowrap ${
+                filter === f ? "bg-foreground text-background" : "bg-secondary text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {f === "all" ? "All" : f}
+            </button>
+          ))}
+        </div>
+        <Button variant="outline" size="sm" onClick={handleExportCSV} className="shrink-0">
+          <Download className="h-3.5 w-3.5 mr-1" /> Export
+        </Button>
       </div>
 
       {/* KPIs */}

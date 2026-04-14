@@ -25,6 +25,7 @@ const AppPage = () => {
   const [hasDashboard, setHasDashboard] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [sidebarView, setSidebarView] = useState<string>("dashboards");
+  const [darkMode, setDarkMode] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -40,8 +41,26 @@ const AppPage = () => {
       if (!session?.user) navigate("/login");
     });
 
+    // Load dark mode preference
+    const saved = localStorage.getItem("datalens-dark-mode");
+    if (saved === "true") {
+      setDarkMode(true);
+      document.documentElement.classList.add("dark");
+    }
+
     return () => subscription.unsubscribe();
   }, [navigate]);
+
+  const toggleDarkMode = () => {
+    const next = !darkMode;
+    setDarkMode(next);
+    localStorage.setItem("datalens-dark-mode", String(next));
+    if (next) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  };
 
   const handleFilesUploaded = (uploadedFiles: UploadedFile[]) => {
     setFiles(uploadedFiles);
@@ -57,7 +76,7 @@ const AppPage = () => {
     <div className="h-screen flex overflow-hidden">
       <AppSidebar currentView={sidebarView} onViewChange={setSidebarView} onNewDashboard={() => setShowUpload(true)} />
       <div className="flex-1 flex flex-col min-w-0">
-        <AppTopBar user={user} onToggleAssistant={() => setAssistantOpen(!assistantOpen)} />
+        <AppTopBar user={user} onToggleAssistant={() => setAssistantOpen(!assistantOpen)} darkMode={darkMode} onToggleDarkMode={toggleDarkMode} />
         <div className="flex-1 flex overflow-hidden">
           <main className="flex-1 overflow-auto">
             {!hasDashboard ? (
