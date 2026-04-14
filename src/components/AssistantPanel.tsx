@@ -79,11 +79,19 @@ export const AssistantPanel = ({ files, onClose }: AssistantPanelProps) => {
 
     try {
       const dataContext = buildDataContext();
-      const { data, error } = await supabase.functions.invoke("ai-assistant", {
-        body: { question, dataContext },
+      const response = await fetch("http://localhost:5000/api/ai/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ question, dataContext }),
       });
 
-      if (error) throw error;
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}`);
+      }
+      
+      const data = await response.json();
       setMessages((prev) => [...prev, { role: "assistant", content: data.answer }]);
     } catch (err: any) {
       setMessages((prev) => [...prev, { role: "assistant", content: `Sorry, I couldn't process that request. ${err.message || "Please try again."}` }]);

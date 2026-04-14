@@ -1,5 +1,6 @@
+// @ts-nocheck
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,7 +14,7 @@ serve(async (req) => {
 
   try {
     const { question, dataContext } = await req.json();
-    const apiKey = Deno.env.get("LOVABLE_API_KEY");
+    const apiKey = Deno.env.get("OPENAI_API_KEY");
     if (!apiKey) throw new Error("API key not configured");
 
     const systemPrompt = `You are an expert data analyst assistant for Power AI, a data analytics platform. 
@@ -30,16 +31,14 @@ When answering:
 
 Data context provided by the user will include column names, sample data, and statistics.`;
 
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://lovable.dev",
-        "X-Title": "Power AI Assistant",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "gpt-4o-mini",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `Here is the data context:\n${dataContext}\n\nUser question: ${question}` },
@@ -54,7 +53,7 @@ Data context provided by the user will include column names, sample data, and st
     return new Response(JSON.stringify({ answer }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (error) {
+  } catch (error: any) {
     return new Response(JSON.stringify({ answer: `Error: ${error.message}` }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
