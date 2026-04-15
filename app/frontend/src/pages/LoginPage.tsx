@@ -21,6 +21,8 @@ const LoginPage = () => {
     if (error) {
       toast.error(error.message);
     } else {
+      toast.success("Signed in successfully!");
+      navigate("/app");
     }
   };
 
