@@ -96,7 +96,7 @@ export const DashboardView = ({ files, onExport }: DashboardViewProps) => {
                   className={`px-3 py-1 text-xs max-[480px]:text-[13px] rounded-full transition-colors whitespace-nowrap border shrink-0 ${
                     !activeFilters[f.column] || activeFilters[f.column] === "all"
                       ? "bg-foreground text-background border-foreground shadow-sm"
-                      : "bg-background text-muted-foreground hover:border-foreground/50 border-border"
+                      : "bg-card text-muted-foreground hover:border-foreground/50 border-[#D3D1C7] dark:border-[#333331]"
                   }`}
                 >
                   All
@@ -108,7 +108,7 @@ export const DashboardView = ({ files, onExport }: DashboardViewProps) => {
                     className={`px-3 py-1 text-xs max-[480px]:text-[13px] rounded-full transition-colors whitespace-nowrap border shrink-0 ${
                       activeFilters[f.column] === val
                         ? "bg-foreground text-background border-foreground shadow-sm"
-                        : "bg-background text-muted-foreground hover:border-foreground/50 border-border"
+                        : "bg-card text-muted-foreground hover:border-foreground/50 border-[#D3D1C7] dark:border-[#333331]"
                     }`}
                   >
                     {val}
@@ -118,7 +118,7 @@ export const DashboardView = ({ files, onExport }: DashboardViewProps) => {
             </div>
           ))}
         </div>
-        <Button variant="outline" size="sm" onClick={handleExportCSV} className="shrink-0 max-[480px]:self-start min-[481px]:self-end">
+        <Button variant="outline" size="sm" onClick={handleExportCSV} className="shrink-0 max-[480px]:self-start min-[481px]:self-end border-[#D3D1C7] text-[#2C2C2A] dark:border-[#333331] dark:text-[#F1EFE8]">
           <Download className="h-3.5 w-3.5 mr-1" /> Export Data
         </Button>
       </div>

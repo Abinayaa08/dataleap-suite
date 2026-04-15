@@ -9,7 +9,6 @@ import {
   Area,
   ScatterChart,
   Scatter,
-  ComposedChart,
   XAxis,
   YAxis,
   Tooltip,
@@ -24,15 +23,22 @@ interface DynamicChartProps {
   data: { name: string; value: number }[];
 }
 
-const COLOR_SCHEMES: Record<string, string[]> = {
-  emerald: ["hsl(var(--foreground))", "hsl(var(--foreground) / 0.8)", "hsl(var(--foreground) / 0.6)", "hsl(var(--foreground) / 0.4)", "hsl(var(--foreground) / 0.2)"],
-  neutral: ["hsl(var(--foreground))", "hsl(var(--foreground) / 0.8)", "hsl(var(--foreground) / 0.6)", "hsl(var(--foreground) / 0.4)", "hsl(var(--foreground) / 0.2)"],
-  warm: ["hsl(var(--foreground))", "hsl(var(--foreground) / 0.8)", "hsl(var(--foreground) / 0.6)", "hsl(var(--foreground) / 0.4)", "hsl(var(--foreground) / 0.2)"],
-};
-
 export const DynamicChart = ({ config, data }: DynamicChartProps) => {
-  const colors = COLOR_SCHEMES[config.color_scheme] || COLOR_SCHEMES.emerald;
-  const mainColor = colors[0];
+  const mainColor = "hsl(var(--chart-bar))";
+  const mutedColor = "hsl(var(--chart-muted))";
+  const lineColor = "hsl(var(--chart-line))";
+  const colors = [mainColor, mutedColor, "hsl(var(--chart-bar) / 0.8)", "hsl(var(--chart-muted) / 0.8)"];
+
+  const tooltipStyle = {
+    contentStyle: {
+      borderRadius: "8px",
+      border: "1px solid hsl(var(--border))",
+      backgroundColor: "hsl(var(--card))",
+      color: "hsl(var(--card-foreground))",
+    },
+    itemStyle: { color: "hsl(var(--foreground))" },
+    labelStyle: { color: "hsl(var(--foreground))" },
+  };
 
   const renderChartType = () => {
     switch (config.type) {
@@ -41,9 +47,7 @@ export const DynamicChart = ({ config, data }: DynamicChartProps) => {
           <BarChart data={data}>
             <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
             <YAxis fontSize={12} tickLine={false} axisLine={false} />
-            <Tooltip
-              contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))" }}
-            />
+            <Tooltip {...tooltipStyle} />
             <Bar dataKey="value" fill={mainColor} radius={[4, 4, 0, 0]} />
           </BarChart>
         );
@@ -52,9 +56,7 @@ export const DynamicChart = ({ config, data }: DynamicChartProps) => {
           <BarChart data={data} layout="vertical">
             <XAxis type="number" fontSize={12} tickLine={false} axisLine={false} />
             <YAxis dataKey="name" type="category" fontSize={12} tickLine={false} axisLine={false} width={80} />
-            <Tooltip
-              contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))" }}
-            />
+            <Tooltip {...tooltipStyle} />
             <Bar dataKey="value" fill={mainColor} radius={[0, 4, 4, 0]} />
           </BarChart>
         );
@@ -63,10 +65,8 @@ export const DynamicChart = ({ config, data }: DynamicChartProps) => {
           <LineChart data={data}>
             <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
             <YAxis fontSize={12} tickLine={false} axisLine={false} />
-            <Tooltip
-              contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))" }}
-            />
-            <Line type="monotone" dataKey="value" stroke={mainColor} strokeWidth={2} dot={false} />
+            <Tooltip {...tooltipStyle} />
+            <Line type="monotone" dataKey="value" stroke={lineColor} strokeWidth={2} dot={false} />
           </LineChart>
         );
       case "area":
@@ -74,19 +74,15 @@ export const DynamicChart = ({ config, data }: DynamicChartProps) => {
           <AreaChart data={data}>
             <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
             <YAxis fontSize={12} tickLine={false} axisLine={false} />
-            <Tooltip
-              contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))" }}
-            />
-            <Area type="monotone" dataKey="value" fill={colors[1]} stroke={mainColor} />
+            <Tooltip {...tooltipStyle} />
+            <Area type="monotone" dataKey="value" fill={mutedColor} stroke={lineColor} />
           </AreaChart>
         );
       case "donut":
       case "pie":
         return (
           <PieChart>
-            <Tooltip
-              contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))" }}
-            />
+            <Tooltip {...tooltipStyle} />
             <Legend />
             <Pie
               data={data}
@@ -106,35 +102,25 @@ export const DynamicChart = ({ config, data }: DynamicChartProps) => {
           <ScatterChart>
             <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
             <YAxis dataKey="value" fontSize={12} tickLine={false} axisLine={false} />
-            <Tooltip
-              contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))" }}
-              cursor={{ strokeDasharray: "3 3" }}
-            />
+            <Tooltip {...tooltipStyle} cursor={{ strokeDasharray: "3 3" }} />
             <Scatter name={config.title} data={data} fill={mainColor} />
           </ScatterChart>
         );
       case "funnel":
-        // simple simulation since strictly funnel requires FunnelChart which isn't imported from raw root usually (it is part of recharts though)
-        // using a horizontal bar chart disguised as funnel since standard recharts funnel can be flaky
         return (
           <BarChart data={data} layout="vertical" barCategoryGap="10%">
             <XAxis type="number" hide />
             <YAxis dataKey="name" type="category" fontSize={12} tickLine={false} axisLine={false} width={80} />
-            <Tooltip
-              contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))" }}
-            />
+            <Tooltip {...tooltipStyle} />
             <Bar dataKey="value" fill={mainColor} radius={[0, 4, 4, 0]} />
           </BarChart>
         );
       default:
-        // fallback
         return (
           <BarChart data={data}>
             <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
             <YAxis fontSize={12} tickLine={false} axisLine={false} />
-            <Tooltip
-              contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))" }}
-            />
+            <Tooltip {...tooltipStyle} />
             <Bar dataKey="value" fill={mainColor} radius={[4, 4, 0, 0]} />
           </BarChart>
         );
@@ -145,7 +131,7 @@ export const DynamicChart = ({ config, data }: DynamicChartProps) => {
   const rowSpanClass = config.height === "medium" ? "row-span-2" : "row-span-1";
 
   return (
-    <div className={`bg-background border rounded-xl shadow-sm p-4 flex flex-col w-full min-[481px]:min-h-[280px] max-[480px]:min-h-[240px] col-span-1 ${colSpanClass} ${rowSpanClass}`}>
+    <div className={`bg-card border border-[0.5px] rounded-xl shadow-sm p-4 flex flex-col w-full min-[481px]:min-h-[280px] max-[480px]:min-h-[240px] col-span-1 ${colSpanClass} ${rowSpanClass}`}>
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="font-semibold text-sm">{config.title}</h3>

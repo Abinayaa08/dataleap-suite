@@ -102,7 +102,7 @@ export const AssistantPanel = ({ files, onClose }: AssistantPanelProps) => {
   };
 
   return (
-    <div className="w-80 border-l flex flex-col bg-background shrink-0 max-[480px]:w-full max-[480px]:fixed max-[480px]:inset-0 max-[480px]:z-50">
+    <div className="w-80 border-l flex flex-col bg-card shrink-0 max-[480px]:w-full max-[480px]:fixed max-[480px]:inset-0 max-[480px]:z-50">
       <div className="h-12 flex items-center px-3 border-b shrink-0">
         <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 mr-2 hidden max-[480px]:flex">
           <ArrowLeft className="h-4 w-4" />
