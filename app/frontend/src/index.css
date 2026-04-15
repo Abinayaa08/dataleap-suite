@@ -128,3 +128,40 @@
     scrollbar-width: none; /* Firefox */
   }
 }
+
+/* ── Print / PDF export styles ── */
+@media print {
+  /* Hide all chrome */
+  [data-sidebar],
+  nav,
+  header,
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: #2C2C2A !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Make dashboard fill the page */
+  html, body, #root {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Cards and charts */
+  .bg-card {
+    background-color: #ffffff !important;
+    border: 0.5px solid #E2E0D8 !important;
+    break-inside: avoid;
+  }
+
+  /* Charts should not be clipped */
+  .recharts-responsive-container {
+    width: 100% !important;
+    height: 220px !important;
+  }
+}

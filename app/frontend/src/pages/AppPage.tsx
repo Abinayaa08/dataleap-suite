@@ -22,25 +22,24 @@ export interface UploadedFile {
   dashboard_config?: any;
 }
 
-export interface SavedFileRecord {
+/** A project groups a name, its uploaded files, and when it was created. */
+export interface Project {
+  id: string;
   name: string;
-  size: number;
-  uploadedAt: string;
+  files: UploadedFile[];
+  createdAt: string;
 }
 
 const AppPage = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
-  const [files, setFiles] = useState<UploadedFile[]>([]);
-  const [hasDashboard, setHasDashboard] = useState(false);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [sidebarView, setSidebarView] = useState<string>("dashboards");
   const [darkMode, setDarkMode] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  // Track saved files (uploads) and downloads (exports)
-  const [savedFiles, setSavedFiles] = useState<SavedFileRecord[]>([]);
   const [downloads, setDownloads] = useState<DownloadRecord[]>([]);
 
   const navigate = useNavigate();
@@ -58,7 +57,6 @@ const AppPage = () => {
       if (!session?.user) navigate("/login");
     });
 
-    // Load dark mode preference
     const saved = localStorage.getItem("PowerAI-dark-mode");
     if (saved === "true") {
       setDarkMode(true);
@@ -79,25 +77,25 @@ const AppPage = () => {
     }
   };
 
-  const handleFilesUploaded = (uploadedFiles: UploadedFile[]) => {
-    setFiles(uploadedFiles);
-    setHasDashboard(true);
+  const handleFilesUploaded = (projectName: string, uploadedFiles: UploadedFile[]) => {
+    const newProject: Project = {
+      id: `project-${Date.now()}`,
+      name: projectName,
+      files: uploadedFiles,
+      createdAt: new Date().toISOString(),
+    };
+    setProjects((prev) => [newProject, ...prev]);
+    setActiveProjectId(newProject.id);
     setShowUpload(false);
     setSidebarView("dashboards");
     setMobileMenuOpen(false);
-
-    // Record each uploaded file in Saved Files
-    const newRecords: SavedFileRecord[] = uploadedFiles.map((f) => ({
-      name: f.name,
-      size: f.size,
-      uploadedAt: new Date().toISOString(),
-    }));
-    setSavedFiles((prev) => [...newRecords, ...prev]);
   };
 
   const handleExport = (record: DownloadRecord) => {
     setDownloads((prev) => [record, ...prev]);
   };
+
+  const activeProject = projects.find((p) => p.id === activeProjectId) ?? projects[0] ?? null;
 
   if (loading) {
     return (
@@ -112,8 +110,11 @@ const AppPage = () => {
       case "files":
         return (
           <SavedFilesView
-            savedFiles={savedFiles}
-            onOpenDashboard={() => setSidebarView("dashboards")}
+            projects={projects}
+            onOpenProject={(id) => {
+              setActiveProjectId(id);
+              setSidebarView("dashboards");
+            }}
           />
         );
       case "downloads":
@@ -126,10 +127,14 @@ const AppPage = () => {
         );
       case "dashboards":
       default:
-        return !hasDashboard ? (
+        return !activeProject ? (
           <EmptyState onCreateNew={() => setShowUpload(true)} />
         ) : (
-          <DashboardView files={files} onExport={handleExport} />
+          <DashboardView
+            files={activeProject.files}
+            projectName={activeProject.name}
+            onExport={handleExport}
+          />
         );
     }
   };
@@ -156,7 +161,10 @@ const AppPage = () => {
             {renderMainContent()}
           </main>
           {assistantOpen && (
-            <AssistantPanel files={files} onClose={() => setAssistantOpen(false)} />
+            <AssistantPanel
+              files={activeProject?.files ?? []}
+              onClose={() => setAssistantOpen(false)}
+            />
           )}
         </div>
       </div>

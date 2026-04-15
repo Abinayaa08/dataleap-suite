@@ -3,18 +3,20 @@ import type { UploadedFile } from "@/pages/AppPage";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { DynamicChart } from "@/components/dashboard/DynamicChart";
 import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
+import { Download, FileText, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { aggregateData, computeKpi } from "@/lib/aggregation";
 import type { DownloadRecord } from "@/components/DownloadsView";
 
 interface DashboardViewProps {
   files: UploadedFile[];
+  projectName: string;
   onExport: (record: DownloadRecord) => void;
 }
 
-export const DashboardView = ({ files, onExport }: DashboardViewProps) => {
+export const DashboardView = ({ files, projectName, onExport }: DashboardViewProps) => {
   const [activeFilters, setActiveFilters] = useState<Record<string, string>>({});
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const dashboardRef = useRef<HTMLDivElement>(null);
 
   const file = files.find((f) => f.dashboard_config) || files[0];
@@ -22,6 +24,7 @@ export const DashboardView = ({ files, onExport }: DashboardViewProps) => {
   const rawData = file?.data || [];
   const columns = file?.columns || [];
 
+  /* ── CSV Export ── */
   const handleExportCSV = () => {
     if (rawData.length === 0) return;
     const header = columns.join(",");
@@ -30,22 +33,93 @@ export const DashboardView = ({ files, onExport }: DashboardViewProps) => {
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    const fileName = `exported_data_${Date.now()}.csv`;
+    const fileName = `${projectName}_${Date.now()}.csv`;
     a.href = url;
     a.download = fileName;
     a.click();
     URL.revokeObjectURL(url);
 
-    // Report to parent so Downloads view can track it
     const sizeBytes = new Blob([csv]).size;
     onExport({
       name: fileName,
       size: sizeBytes,
       exportedAt: new Date().toISOString(),
+      projectName,
+      type: "csv",
       csvContent: csv,
     });
-
+    setExportMenuOpen(false);
     toast.success("Data exported as CSV");
+  };
+
+  /* ── PDF Export ── */
+  const handleExportPDF = () => {
+    const printWindow = window.open("", "_blank", "width=1200,height=900");
+    if (!printWindow || !dashboardRef.current) return;
+
+    const styles = Array.from(document.styleSheets)
+      .map((sheet) => {
+        try {
+          return Array.from(sheet.cssRules).map((r) => r.cssText).join("\n");
+        } catch {
+          return "";
+        }
+      })
+      .join("\n");
+
+    const isDark = document.documentElement.classList.contains("dark");
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html class="${isDark ? "dark" : ""}">
+      <head>
+        <meta charset="UTF-8" />
+        <title>${projectName} — Dashboard</title>
+        <style>
+          ${styles}
+          @page { margin: 16mm; }
+          body {
+            background: ${isDark ? "#141413" : "#F7F6F3"};
+            color: ${isDark ? "#F1EFE8" : "#2C2C2A"};
+            font-family: Inter, -apple-system, sans-serif;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          .no-print { display: none !important; }
+          .print-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid ${isDark ? "#333331" : "#E2E0D8"};
+            color: ${isDark ? "#F1EFE8" : "#2C2C2A"};
+          }
+        </style>
+      </head>
+      <body>
+        <div class="print-title">${projectName} Dashboard</div>
+        ${dashboardRef.current.innerHTML}
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 600);
+
+    const fileName = `${projectName}_dashboard_${Date.now()}.pdf`;
+    onExport({
+      name: fileName,
+      size: 0,
+      exportedAt: new Date().toISOString(),
+      projectName,
+      type: "pdf",
+      csvContent: "",
+    });
+    setExportMenuOpen(false);
+    toast.success("Dashboard opened for PDF export");
   };
 
   if (!config) {
@@ -62,10 +136,7 @@ export const DashboardView = ({ files, onExport }: DashboardViewProps) => {
   const filtersConfig = config.filters || [];
 
   const setFilterValue = (column: string, value: string) => {
-    setActiveFilters((prev) => ({
-      ...prev,
-      [column]: value,
-    }));
+    setActiveFilters((prev) => ({ ...prev, [column]: value }));
   };
 
   const uniqueFilterValues = useMemo(() => {
@@ -82,6 +153,12 @@ export const DashboardView = ({ files, onExport }: DashboardViewProps) => {
 
   return (
     <div ref={dashboardRef} className="h-full flex flex-col p-4 gap-4 bg-background/50 overflow-auto">
+
+      {/* Project name heading */}
+      <div className="flex items-center justify-between shrink-0">
+        <h1 className="text-base font-bold tracking-tight truncate">{projectName}</h1>
+      </div>
+
       {/* Filters + Export */}
       <div className="flex flex-col min-[481px]:flex-row min-[481px]:items-start justify-between gap-3 shrink-0">
         <div className="flex flex-col gap-2 w-full min-w-0">
@@ -118,9 +195,43 @@ export const DashboardView = ({ files, onExport }: DashboardViewProps) => {
             </div>
           ))}
         </div>
-        <Button variant="outline" size="sm" onClick={handleExportCSV} className="shrink-0 max-[480px]:self-start min-[481px]:self-end border-[#D3D1C7] text-[#2C2C2A] dark:border-[#333331] dark:text-[#F1EFE8]">
-          <Download className="h-3.5 w-3.5 mr-1" /> Export Data
-        </Button>
+
+        {/* Export dropdown */}
+        <div className="relative shrink-0 max-[480px]:self-start min-[481px]:self-end no-print">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setExportMenuOpen((o) => !o)}
+            className="border-[#D3D1C7] text-[#2C2C2A] dark:border-[#333331] dark:text-[#F1EFE8] gap-1"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Export
+            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${exportMenuOpen ? "rotate-180" : ""}`} />
+          </Button>
+          {exportMenuOpen && (
+            <>
+              {/* click-away backdrop */}
+              <div className="fixed inset-0 z-10" onClick={() => setExportMenuOpen(false)} />
+              <div className="absolute right-0 top-full mt-1.5 z-20 bg-card border border-[#E2E0D8] dark:border-[#333331] rounded-lg shadow-lg overflow-hidden min-w-[140px]">
+                <button
+                  onClick={handleExportCSV}
+                  className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm hover:bg-secondary transition-colors"
+                >
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  Export as CSV
+                </button>
+                <div className="h-px bg-border" />
+                <button
+                  onClick={handleExportPDF}
+                  className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm hover:bg-secondary transition-colors"
+                >
+                  <Download className="h-4 w-4 text-muted-foreground" />
+                  Export as PDF
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* KPIs */}
