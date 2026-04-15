@@ -21,6 +21,7 @@ const LoginPage = () => {
     if (error) {
       toast.error(error.message);
     } else {
+      navigate("/app");
     }
   };
 
