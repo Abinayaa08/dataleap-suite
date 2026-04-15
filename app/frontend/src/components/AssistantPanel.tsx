@@ -3,6 +3,7 @@ import { X, Send, Mic, Loader2, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
+import { useSettings } from "@/context/SettingsContext";
 import type { UploadedFile } from "@/pages/AppPage";
 
 interface Message {
@@ -16,6 +17,7 @@ interface AssistantPanelProps {
 }
 
 export const AssistantPanel = ({ files, onClose }: AssistantPanelProps) => {
+  const { settings } = useSettings();
   const [messages, setMessages] = useState<Message[]>([
     { role: "assistant", content: "Hello! I can help you " },
   ]);
@@ -82,10 +84,8 @@ export const AssistantPanel = ({ files, onClose }: AssistantPanelProps) => {
       const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
       const response = await fetch(`${baseUrl}/api/ai/chat`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ question, dataContext }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question, dataContext, aiStyle: settings.aiStyle }),
       });
 
       if (!response.ok) {

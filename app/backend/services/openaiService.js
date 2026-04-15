@@ -4,18 +4,31 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-async function getAiInsight(question, dataContext) {
-  const systemPrompt = `You are an expert data analyst assistant for Power AI, a data analytics platform. 
-You analyze data and provide clear, structured, professional insights.
+async function getAiInsight(question, dataContext, aiStyle = 'balanced') {
+  const styleGuide = {
+    concise: `- Be very brief — maximum 3 bullet points or 80 words.
+- Give only the most important number or fact.
+- No background context, no caveats — only the answer.`,
+    balanced: `- Be clear and structured — use bullet points.
+- Provide specific numbers from the data.
+- Explain WHY patterns exist.
+- Suggest one actionable next step.
+- Keep responses under 200 words.`,
+    detailed: `- Provide a thorough, structured analysis.
+- Cover trends, outliers, root causes, and recommendations.
+- Use sections with short headers if the answer is multi-part.
+- Include supporting numbers and comparisons.
+- Responses up to 400 words are acceptable.`,
+  };
 
-When answering:
-- Be concise and direct
-- Use bullet points for clarity
-- Provide specific numbers from the data
-- Explain WHY patterns exist
-- Suggest actionable next steps
-- Never use emojis or decorative symbols
-- Keep responses under 200 words
+  const systemPrompt = `You are an expert data analyst assistant for PowerAI, a data analytics platform.
+You analyze data and provide professional insights.
+
+Response style: ${aiStyle.toUpperCase()}
+${styleGuide[aiStyle] || styleGuide.balanced}
+
+- Never use emojis or decorative symbols.
+- Use the actual column names and numbers from the provided data context.
 
 Data context provided by the user will include column names, sample data, and statistics.`;
 
@@ -26,7 +39,7 @@ Data context provided by the user will include column names, sample data, and st
         { role: 'system', content: systemPrompt },
         { role: 'user', content: `Here is the data context:\n${dataContext}\n\nUser question: ${question}` },
       ],
-      max_tokens: 500,
+      max_tokens: aiStyle === 'concise' ? 200 : aiStyle === 'detailed' ? 700 : 450,
     });
 
     return response.choices[0].message.content;

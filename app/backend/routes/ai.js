@@ -5,20 +5,18 @@ const { logAiQuery } = require('../services/supabaseService');
 
 router.post('/chat', async (req, res) => {
   try {
-    const { question, dataContext } = req.body;
+    const { question, dataContext, aiStyle } = req.body;
 
     if (!question) {
       return res.status(400).json({ error: 'Question is required' });
     }
 
-    // Call OpenAI
-    const responseText = await getAiInsight(question, dataContext || "No context provided.");
+    // Call OpenAI with the user's preferred response style
+    const responseText = await getAiInsight(question, dataContext || "No context provided.", aiStyle || 'balanced');
 
-    // Bonus: Log the query and response to Supabase
-    // We execute this asynchronously so it doesn't block the UI response
+    // Log asynchronously (non-blocking)
     logAiQuery(question, responseText).catch(e => console.error("Logging failed", e));
 
-    // Match the JSON structure originally returned by the Supabase Edge Function
     res.status(200).json({ answer: responseText });
     
   } catch (error) {

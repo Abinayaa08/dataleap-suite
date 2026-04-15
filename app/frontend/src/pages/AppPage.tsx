@@ -10,6 +10,8 @@ import { DashboardView } from "@/components/DashboardView";
 import { AssistantPanel } from "@/components/AssistantPanel";
 import { SavedFilesView } from "@/components/SavedFilesView";
 import { DownloadsView } from "@/components/DownloadsView";
+import { SettingsView } from "@/components/SettingsView";
+import { SettingsProvider } from "@/context/SettingsContext";
 import type { DownloadRecord } from "@/components/DownloadsView";
 
 export interface UploadedFile {
@@ -121,9 +123,10 @@ const AppPage = () => {
         return <DownloadsView downloads={downloads} />;
       case "settings":
         return (
-          <div className="h-full flex items-center justify-center text-muted-foreground">
-            <p>Settings coming soon.</p>
-          </div>
+          <SettingsView
+            darkMode={darkMode}
+            onToggleDarkMode={toggleDarkMode}
+          />
         );
       case "dashboards":
       default:
@@ -178,4 +181,10 @@ const AppPage = () => {
   );
 };
 
-export default AppPage;
+const AppPageWrapper = () => (
+  <SettingsProvider>
+    <AppPage />
+  </SettingsProvider>
+);
+
+export default AppPageWrapper;
