@@ -25,9 +25,9 @@ interface DynamicChartProps {
 }
 
 const COLOR_SCHEMES: Record<string, string[]> = {
-  emerald: ["#10b981", "#34d399", "#6ee7b7", "#a7f3d0", "#059669"],
-  neutral: ["#64748b", "#94a3b8", "#cbd5e1", "#475569", "#334155"],
-  warm: ["#f59e0b", "#fbbf24", "#fcd34d", "#d97706", "#b45309"],
+  emerald: ["hsl(var(--foreground))", "hsl(var(--foreground) / 0.8)", "hsl(var(--foreground) / 0.6)", "hsl(var(--foreground) / 0.4)", "hsl(var(--foreground) / 0.2)"],
+  neutral: ["hsl(var(--foreground))", "hsl(var(--foreground) / 0.8)", "hsl(var(--foreground) / 0.6)", "hsl(var(--foreground) / 0.4)", "hsl(var(--foreground) / 0.2)"],
+  warm: ["hsl(var(--foreground))", "hsl(var(--foreground) / 0.8)", "hsl(var(--foreground) / 0.6)", "hsl(var(--foreground) / 0.4)", "hsl(var(--foreground) / 0.2)"],
 };
 
 export const DynamicChart = ({ config, data }: DynamicChartProps) => {
@@ -150,7 +150,7 @@ export const DynamicChart = ({ config, data }: DynamicChartProps) => {
         <div>
           <h3 className="font-semibold text-sm">{config.title}</h3>
           <p className="text-xs text-muted-foreground mr-2">
-            {config.aggregation.toUpperCase()} of {config.y_column} by {config.x_column}
+            {(config.aggregation || "").toUpperCase()} of {config.y_column} by {config.x_column}
           </p>
         </div>
       </div>

@@ -3,6 +3,7 @@ import { X, Upload, FileText, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { UploadedFile } from "@/pages/AppPage";
 import { supabase } from "@/integrations/supabase/client";
+import * as xlsx from "xlsx";
 
 interface FileUploadModalProps {
   onClose: () => void;
@@ -70,37 +71,89 @@ export const FileUploadModal = ({ onClose, onFilesUploaded }: FileUploadModalPro
       let size = 1024;
       let type = "text/csv";
 
-      if (file && file.name.endsWith(".csv")) {
+      if (file && (file.name.endsWith(".csv") || file.name.endsWith(".xlsx") || file.name.endsWith(".xls"))) {
         name = file.name;
         size = file.size;
         type = file.type;
-        const text = await file.text();
-        const lines = text.split("\n").map((l) => l.split(",").map((c) => c.trim()));
-        columns = lines[0] || columns;
-        data = lines.slice(1).filter((r) => r.length > 1);
+        
+        if (file.name.endsWith(".csv")) {
+          const text = await file.text();
+          const lines = text.split("\n").map((l) => l.split(",").map((c) => c.trim()));
+          columns = lines[0] || columns;
+          data = lines.slice(1).filter((r) => r.length > 1);
+        } else {
+          const buffer = await file.arrayBuffer();
+          const wb = xlsx.read(buffer, { type: "array" });
+          const wsname = wb.SheetNames[0];
+          const ws = wb.Sheets[wsname];
+          const parsedData = xlsx.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+          if (parsedData.length > 0) {
+            columns = parsedData[0].map(String);
+            data = parsedData.slice(1).filter((r) => r.length > 0);
+          }
+        }
       } else {
-        data = generateSampleData();
+        setStatusText("Loading sample dataset...");
+        const res = await fetch("/sample_sales_dataset.xlsx");
+        if (!res.ok) throw new Error("Failed to load sample dataset from public folder");
+        const actBuffer = await res.arrayBuffer();
+        const wb = xlsx.read(actBuffer, { type: "array" });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const parsedData = xlsx.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+        if (parsedData.length > 0) {
+          columns = parsedData[0].map(String);
+          data = parsedData.slice(1).filter((r) => r.length > 0);
+        }
+        name = "sample_sales_dataset.xlsx";
+        size = Number(res.headers.get("content-length")) || 5441;
+        type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
       }
 
-      setStatusText("Analyzing schema with AI...");
-      const schemaPayload = extractSchemaPayload(columns, data);
-      
-      const schemaRes = await fetch("http://localhost:5000/api/ai/schema-analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(schemaPayload)
-      });
-      if (!schemaRes.ok) throw new Error("Failed to analyze schema");
-      const schemaAnalysis = await schemaRes.json();
+      let schemaAnalysis: any = null;
+      let dashboardConfig: any = null;
 
-      setStatusText("Generating Dashboard Layout...");
-      const configRes = await fetch("http://localhost:5000/api/ai/dashboard-config", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(schemaAnalysis)
-      });
-      if (!configRes.ok) throw new Error("Failed to generate config");
-      const dashboardConfig = await configRes.json();
+      if (file) {
+        setStatusText("Analyzing schema with AI...");
+        const schemaPayload = extractSchemaPayload(columns, data);
+        
+        const schemaRes = await fetch("http://localhost:5000/api/ai/schema-analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(schemaPayload)
+        });
+        if (!schemaRes.ok) throw new Error("Failed to analyze schema");
+        schemaAnalysis = await schemaRes.json();
+
+        setStatusText("Generating Dashboard Layout...");
+        const configRes = await fetch("http://localhost:5000/api/ai/dashboard-config", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(schemaAnalysis)
+        });
+        if (!configRes.ok) throw new Error("Failed to generate config");
+        dashboardConfig = await configRes.json();
+      } else {
+        schemaAnalysis = extractSchemaPayload(columns, data);
+        dashboardConfig = {
+          kpis: [
+            { label: "Total Sales", aggregation: "sum", column: "Sales", format: "currency" },
+            { label: "Total Profit", aggregation: "sum", column: "Profit", format: "currency" },
+            { label: "Avg Quantity", aggregation: "avg", column: "Quantity", format: "number" }
+          ],
+          charts: [
+            { id: "c1", type: "bar", title: "Sales by Region", aggregation: "sum", y_column: "Sales", x_column: "Region", color_scheme: "emerald" },
+            { id: "c2", type: "line", title: "Profit over Time", aggregation: "sum", y_column: "Profit", x_column: "Date", color_scheme: "emerald" },
+            { id: "c3", type: "pie", title: "Sales by Category", aggregation: "sum", y_column: "Sales", x_column: "Category", color_scheme: "emerald" },
+            { id: "c4", type: "bar", title: "Quantity by Product", aggregation: "sum", y_column: "Quantity", x_column: "Product", color_scheme: "emerald" }
+          ],
+          filters: [
+            { column: "Region", label: "Region" },
+            { column: "Category", label: "Category" },
+            { column: "Product", label: "Product" }
+          ]
+        };
+      }
 
       setStatusText("Saving to Database...");
       const { data: sessionData } = await supabase.auth.getSession();
@@ -147,7 +200,7 @@ export const FileUploadModal = ({ onClose, onFilesUploaded }: FileUploadModalPro
             <div className="space-y-2">
               {files.map((file, i) => (
                 <div key={i} className="flex items-center gap-2 p-3 bg-secondary/50 rounded-md border text-sm">
-                  <FileText className="h-4 w-4 text-emerald-500 shrink-0" />
+                  <FileText className="h-4 w-4 text-foreground shrink-0" />
                   <span className="flex-1 truncate font-medium">{file.name}</span>
                   <span className="text-xs text-muted-foreground mr-2">{(file.size / 1024).toFixed(0)}KB</span>
                   <button onClick={() => removeFile(i)} className="text-muted-foreground hover:text-foreground" disabled={processing}><X className="h-3 w-3" /></button>
@@ -161,14 +214,14 @@ export const FileUploadModal = ({ onClose, onFilesUploaded }: FileUploadModalPro
             onDragLeave={() => setDragOver(false)}
             onDrop={handleDrop}
             className={`border-2 border-dashed rounded-xl p-10 text-center transition-all duration-200 ${
-              dragOver ? "border-emerald-500 bg-emerald-500/5" : "border-border hover:bg-secondary/50"
+              dragOver ? "border-foreground bg-foreground/5" : "border-border hover:bg-secondary/50"
             } ${processing ? 'opacity-50 pointer-events-none' : ''}`}
           >
-            <Upload className={`h-10 w-10 mx-auto mb-4 ${dragOver ? 'text-emerald-500' : 'text-muted-foreground'}`} />
+            <Upload className={`h-10 w-10 mx-auto mb-4 ${dragOver ? 'text-foreground' : 'text-muted-foreground'}`} />
             <p className="text-sm font-medium mb-1">Drag and drop file here</p>
             <p className="text-xs text-muted-foreground mb-4">Upload a dataset to auto-generate a dashboard.</p>
             <label>
-              <input type="file" accept=".csv" onChange={handleFileSelect} className="hidden" disabled={processing} />
+              <input type="file" accept=".csv, .xlsx, .xls" onChange={handleFileSelect} className="hidden" disabled={processing} />
               <span className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium transition-colors bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-md cursor-pointer">
                 Browse Files
               </span>
@@ -189,13 +242,4 @@ export const FileUploadModal = ({ onClose, onFilesUploaded }: FileUploadModalPro
   );
 };
 
-function generateSampleData(): any[][] {
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  return months.map((m) => [
-    m,                                                  // Month
-    String(Math.floor(Math.random() * 50000 + 30000)),  // Revenue
-    String(Math.floor(Math.random() * 3000 + 1000)),    // Users
-    String((Math.random() * 5 + 2).toFixed(1)),         // Conversion
-    String((Math.random() * 30 - 5).toFixed(1)),        // Growth
-  ]);
-}
+
