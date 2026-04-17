@@ -329,29 +329,6 @@ Access application: http://localhost:5173
 Project Security Architecture
 Authentication Method: Supabase Auth Security Features:
 
-Enterprise-grade security protocols
-User session isolation
-Private dashboard segregation
-Secure API communication
-OpenAI API integration with authentication
-Project Structure Hierarchy
-Code
-Auto-Power-BI/
-├── app/
-│   ├── frontend/
-│   │   ├── src/
-│   │   │   ├── components/
-│   │   │   ├── pages/
-│   │   ├── package.json
-│   ├── backend/
-│   │   ├── server.js
-│   │   ├── routes/
-│   │   ├── services/
-│   │   ├── package.json
-│   ├── package.json
-├── README.md
-└── .gitignore
-Project Purpose and Use Case
 Auto-Power-BI represents an enterprise-level AI-driven business intelligence platform engineered to:
 
 Provide zero-configuration data import and processing
